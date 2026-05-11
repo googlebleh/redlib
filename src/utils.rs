@@ -1020,7 +1020,7 @@ pub fn format_url(url: &str) -> String {
 	if url.is_empty() || url == "self" || url == "default" || url == "nsfw" || url == "spoiler" {
 		String::new()
 	} else {
-		Url::parse(url).map_or(url.to_string(), |parsed| {
+		let result = Url::parse(url).map_or(url.to_string(), |parsed| {
 			let domain = parsed.domain().unwrap_or_default();
 
 			let capture = |regex: &Regex, format: &str, segments: i16| {
@@ -1068,7 +1068,15 @@ pub fn format_url(url: &str) -> String {
 				"www.redditstatic.com" => capture(&REGEX_URL_STATIC_MEDIA, "/static/", 1),
 				_ => url.to_string(),
 			}
-		})
+		});
+		// Prefix in-app paths (those starting with '/') with REDLIB_BASE_PATH so
+		// they resolve correctly when redlib is hosted at a subpath. External
+		// URLs are returned unchanged.
+		if result.starts_with('/') {
+			format!("{}{result}", prefix())
+		} else {
+			result
+		}
 	}
 }
 
@@ -1092,9 +1100,10 @@ static REDLIB_PREVIEW_TEXT_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(
 
 /// Rewrite Reddit links to Redlib in body of text
 pub fn rewrite_urls(input_text: &str) -> String {
+	let reddit_link_replacement = format!(r#"href="{}/"#, prefix());
 	let mut text1 =
 		// Rewrite Reddit links to Redlib
-		REDDIT_REGEX.replace_all(input_text, r#"href="/"#).to_string();
+		REDDIT_REGEX.replace_all(input_text, reddit_link_replacement.as_str()).to_string();
 
 	loop {
 		if REDDIT_EMOJI_REGEX.find(&text1).is_none() {
@@ -1116,7 +1125,14 @@ pub fn rewrite_urls(input_text: &str) -> String {
 		} else {
 			let formatted_url = format_url(REDDIT_PREVIEW_REGEX.find(&text1).map(|x| x.as_str()).unwrap_or_default());
 
-			let image_url = REDLIB_PREVIEW_LINK_REGEX.find(&formatted_url).map_or("", |m| m.as_str());
+			// `formatted_url` has the base path prepended by format_url, but the
+			// regex below captures only from `/img/` or `/preview/` onwards.
+			// Re-add the prefix so the subsequent str-replace matches the
+			// prefix-prepended text1.
+			let image_url_owned = REDLIB_PREVIEW_LINK_REGEX
+				.find(&formatted_url)
+				.map_or(String::new(), |m| format!("{}{}", prefix(), m.as_str()));
+			let image_url = image_url_owned.as_str();
 			let mut image_caption = REDLIB_PREVIEW_TEXT_REGEX.find(&formatted_url).map_or("", |m| m.as_str());
 
 			/* As long as image_caption isn't empty remove first and last four characters of image_text to leave us with just the text in the caption without any HTML.
@@ -1146,9 +1162,9 @@ pub fn rewrite_urls(input_text: &str) -> String {
 			let reddit_preview_regex_capture = REDDIT_PREVIEW_REGEX.captures(&text1).unwrap().get(1).map_or("", |m| m.as_str());
 
 			let _preview_type = match reddit_preview_regex_capture {
-				"preview" => "/preview/pre",
-				"external-preview" => "/preview/external-pre",
-				_ => "/img",
+				"preview" => format!("{}/preview/pre", prefix()),
+				"external-preview" => format!("{}/preview/external-pre", prefix()),
+				_ => format!("{}/img", prefix()),
 			};
 
 			text1 = REDDIT_PREVIEW_REGEX
@@ -1308,12 +1324,56 @@ pub fn template(t: &impl Template) -> Response<Body> {
 }
 
 pub fn redirect(path: &str) -> Response<Body> {
+	let full = with_prefix(path);
 	Response::builder()
 		.status(302)
 		.header("content-type", "text/html")
-		.header("Location", path)
-		.body(format!("Redirecting to <a href=\"{path}\">{path}</a>...").into())
+		.header("Location", &full)
+		.body(format!("Redirecting to <a href=\"{full}\">{full}</a>...").into())
 		.unwrap_or_default()
+}
+
+/// The base path the instance is served under (e.g. `/redlib`).
+///
+/// Empty string when redlib is served at the root of the host. Otherwise has
+/// a leading slash and no trailing slash so it can be prepended to absolute
+/// in-app paths to produce a valid URL.
+pub fn prefix() -> &'static str {
+	static BASE_PATH: LazyLock<String> = LazyLock::new(|| match get_setting("REDLIB_BASE_PATH") {
+		Some(raw) => {
+			let trimmed = raw.trim().trim_end_matches('/');
+			if trimmed.is_empty() {
+				String::new()
+			} else if trimmed.starts_with('/') {
+				trimmed.to_string()
+			} else {
+				format!("/{trimmed}")
+			}
+		}
+		None => String::new(),
+	});
+	&BASE_PATH
+}
+
+/// The path attribute to set on cookies — the prefix, or `/` if there is no prefix.
+pub fn cookie_path() -> &'static str {
+	let p = prefix();
+	if p.is_empty() {
+		"/"
+	} else {
+		p
+	}
+}
+
+/// Prepend the base path to an absolute in-app path (one starting with `/`).
+/// Non-absolute paths and external URLs are returned unchanged.
+pub fn with_prefix(path: &str) -> String {
+	let prefix = prefix();
+	if prefix.is_empty() || !path.starts_with('/') {
+		path.to_string()
+	} else {
+		format!("{prefix}{path}")
+	}
 }
 
 /// Renders a generic error landing page.

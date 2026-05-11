@@ -8,14 +8,14 @@
 
 {% macro sort(root, methods, selected) -%}
 	{% for method in methods %}
-		<a {% if method.to_string() == selected.to_string() %}class="selected"{% endif %} href="{{ root }}/{{ method }}">
+		<a {% if method.to_string() == selected.to_string() %}class="selected"{% endif %} href="{{ crate::utils::prefix() }}{{ root }}/{{ method }}">
 			{{ format!("{}{}", method.get(0..1).unwrap_or_default().to_uppercase(), method.get(1..).unwrap_or_default()) }}
 		</a>
 	{% endfor %}
 {%- endmacro %}
 
 {% macro search(root, search) -%}
-<form action="{% if root != "/r/" && !root.is_empty() %}{{ root }}{% endif %}/search" id="searchbox">
+<form action="{{ crate::utils::prefix() }}{% if root != "/r/" && !root.is_empty() %}{{ root }}{% endif %}/search" id="searchbox">
 	<input id="search" type="text" name="q" placeholder="Search" title="Search redlib" value="{{ search }}">
 	{% if root != "/r/" && !root.is_empty() %}
 	<div id="inside">
@@ -42,15 +42,15 @@
 		<summary>Feeds</summary>
 		<div id="feed_list">
 			<p>MAIN FEEDS</p>
-			<a href="/">Home</a>
+			<a href="{{ crate::utils::prefix() }}/">Home</a>
 			{% if prefs.remove_default_feeds != "on" %}
-				<a href="/r/popular">Popular</a>
-				<a href="/r/all">All</a>
+				<a href="{{ crate::utils::prefix() }}/r/popular">Popular</a>
+				<a href="{{ crate::utils::prefix() }}/r/all">All</a>
 			{% endif %}
 			{% if prefs.subscriptions.len() > 0 %}
 				<p>REDDIT FEEDS</p>
 				{% for sub in prefs.subscriptions %}
-					<a href="/r/{{ sub }}" {% if sub == current %}class="selected"{% endif %}>{{ sub }}</a>
+					<a href="{{ crate::utils::prefix() }}/r/{{ sub }}" {% if sub == current %}class="selected"{% endif %}>{{ sub }}</a>
 				{% endfor %}
 			{% endif %}
 		</div>
@@ -59,7 +59,7 @@
 
 {% macro render_hls_notification(redirect_url) -%}
 {% if post.post_type == "video" && !post.media.alt_url.is_empty() && prefs.hide_hls_notification != "on" %}
-<div class="post_notification"><p><a href="/settings/update/?use_hls=on&redirect={{ redirect_url }}">Enable HLS</a> to view with audio, or <a href="/settings/update/?hide_hls_notification=on&redirect={{ redirect_url }}">disable this notification</a></p></div>
+<div class="post_notification"><p><a href="{{ crate::utils::prefix() }}/settings/update/?use_hls=on&redirect={{ redirect_url }}">Enable HLS</a> to view with audio, or <a href="{{ crate::utils::prefix() }}/settings/update/?hide_hls_notification=on&redirect={{ redirect_url }}">disable this notification</a></p></div>
 {% endif %}
 {%- endmacro %}
 
@@ -68,9 +68,9 @@
 <!-- POST CONTENT -->
 <div class="post highlighted{% if post_should_be_blurred %} post_blurred{% endif %}">
 	<p class="post_header">
-		<a class="post_subreddit" href="/r/{{ post.community }}">r/{{ post.community }}</a>
+		<a class="post_subreddit" href="{{ crate::utils::prefix() }}/r/{{ post.community }}">r/{{ post.community }}</a>
 		<span class="dot">&bull;</span>
-		<a class="post_author {{ post.author.distinguished }}" href="/user/{{ post.author.name }}">u/{{ post.author.name }}</a>
+		<a class="post_author {{ post.author.distinguished }}" href="{{ crate::utils::prefix() }}/user/{{ post.author.name }}">u/{{ post.author.name }}</a>
 		{% if post.author.flair.flair_parts.len() > 0 %}
 			<small class="author_flair">{% call render_flair(post.author.flair.flair_parts) %}</small>
 		{% endif %}
@@ -90,7 +90,7 @@
 	</p>
 	<h1 class="post_title">
 		{% if post.flair.flair_parts.len() > 0 %}
-			<a href="/r/{{ post.community }}/search?q=flair_name%3A%22{{ post.flair.text }}%22&restrict_sr=on"
+			<a href="{{ crate::utils::prefix() }}/r/{{ post.community }}/search?q=flair_name%3A%22{{ post.flair.text }}%22&restrict_sr=on"
 				class="post_flair"
 				style="color:{{ post.flair.foreground_color }}; background:{{ post.flair.background_color }};">{% call render_flair(post.flair.flair_parts) %}</a>
 		{% endif %}
@@ -122,14 +122,14 @@
 	</div>
 	{% else if post.post_type == "video" || post.post_type == "gif" %}
 	{% if prefs.use_hls == "on" && !post.media.alt_url.is_empty() %}
-	<script src="/hls.min.js"></script>
+	<script src="{{ crate::utils::prefix() }}/hls.min.js"></script>
 	<div class="post_media_content">
 		<video class="post_media_video short {% if prefs.autoplay_videos == "on" %}hls_autoplay{% endif %}" {% if post.media.width > 0 && post.media.height > 0 %}width="{{ post.media.width }}" height="{{ post.media.height }}"{% endif %} poster="{{ post.media.poster }}" preload="none" controls>
 			<source src="{{ post.media.alt_url }}" type="application/vnd.apple.mpegurl" />
 			<source src="{{ post.media.url }}" type="video/mp4" />
 		</video>
 	</div>
-	<script src="/playHLSVideo.js"></script>
+	<script src="{{ crate::utils::prefix() }}/playHLSVideo.js"></script>
 	{% else %}
 	<div class="post_media_content">
 		<video class="post_media_video" src="{{ post.media.url }}" controls {% if prefs.autoplay_videos == "on" %}autoplay{% endif %} loop><a href={{ post.media.url }}>Video</a></video>
@@ -169,13 +169,13 @@
 	<div class="post_footer">
 		<ul id="post_links">
 			<li>
-				<a href="{{ post.permalink }}">
+				<a href="{{ crate::utils::prefix() }}{{ post.permalink }}">
 					<span class="desktop_item">perma</span>link
 				</a>
 			</li>
 			{% if post.num_duplicates > 0 %}
 			<li>
-				<a href="/r/{{ post.community }}/duplicates/{{ post.id }}">
+				<a href="{{ crate::utils::prefix() }}/r/{{ post.community }}/duplicates/{{ post.id }}">
 					dup<span class="desktop_item">licat</span>es
 				</a>
 			</li>
@@ -227,9 +227,9 @@
 		{% else -%}
 			{% let community = format!("r/{}", post.community) -%}
 		{% endif -%}
-		<a class="post_subreddit" href="/{{ community }}">{{ community }}</a>
+		<a class="post_subreddit" href="{{ crate::utils::prefix() }}/{{ community }}">{{ community }}</a>
 		<span class="dot">&bull;</span>
-		<a class="post_author {{ post.author.distinguished }}" href="/u/{{ post.author.name }}">u/{{ post.author.name }}</a>
+		<a class="post_author {{ post.author.distinguished }}" href="{{ crate::utils::prefix() }}/u/{{ post.author.name }}">u/{{ post.author.name }}</a>
 		<span class="dot">&bull;</span>
 		<span class="created" title="{{ post.created }}">{{ post.rel_time }}</span>
 		{% if !post.awards.is_empty() && prefs.hide_awards != "on" %}
@@ -242,12 +242,12 @@
 	</p>
 	<h2 class="post_title">
 		{% if post.flair.flair_parts.len() > 0 %}
-			<a href="/r/{{ post.community }}/search?q=flair_name%3A%22{{ post.flair.text }}%22&restrict_sr=on"
+			<a href="{{ crate::utils::prefix() }}/r/{{ post.community }}/search?q=flair_name%3A%22{{ post.flair.text }}%22&restrict_sr=on"
 				class="post_flair"
 				style="color:{{ post.flair.foreground_color }}; background:{{ post.flair.background_color }};"
 				dir="ltr">{% call render_flair(post.flair.flair_parts) %}</a>
 		{% endif %}
-		<a href="{{ post.permalink }}">{{ post.title }}</a>{% if post.flags.nsfw %} <small class="nsfw">NSFW</small>{% endif %}{% if post.flags.spoiler %} <small class="spoiler">Spoiler</small>{% endif %}
+		<a href="{{ crate::utils::prefix() }}{{ post.permalink }}">{{ post.title }}</a>{% if post.flags.nsfw %} <small class="nsfw">NSFW</small>{% endif %}{% if post.flags.spoiler %} <small class="spoiler">Spoiler</small>{% endif %}
 	</h2>
 	<!-- POST MEDIA/THUMBNAIL -->
 	{% if (prefs.layout.is_empty() || prefs.layout == "card") && post.post_type == "image" %}
@@ -284,7 +284,7 @@
 	{% call render_hls_notification(format!("{}%23{}", &self.url[1..].replace("&", "%26").replace("+", "%2B"), post.id)) %}
 	{% endif %}
 	{% else if post.post_type != "self" %}
-	<a class="post_thumbnail{% if post.thumbnail.url.is_empty() %} no_thumbnail{% endif %}" href="{% if post.post_type == "link" %}{{ post.media.url }}{% else %}{{ post.permalink }}{% endif %}" rel="nofollow">
+	<a class="post_thumbnail{% if post.thumbnail.url.is_empty() %} no_thumbnail{% endif %}" href="{% if post.post_type == "link" %}{{ post.media.url }}{% else %}{{ crate::utils::prefix() }}{{ post.permalink }}{% endif %}" rel="nofollow">
 		{% if post.thumbnail.url.is_empty() %}
 		<svg viewBox="0 0 100 106" width="140" height="53" xmlns="http://www.w3.org/2000/svg">
 			<title>Thumbnail</title>
@@ -317,7 +317,7 @@
 	{% call poll(post) %}
 
 	<div class="post_footer">
-		<a href="{{ post.permalink }}" class="post_comments" title="{{ post.comments.1 }} {% if post.comments.1 == "1" %}comment{% else %}comments{% endif %}">{{ post.comments.0 }} {% if post.comments.1 == "1" %}comment{% else %}comments{% endif %}</a>
+		<a href="{{ crate::utils::prefix() }}{{ post.permalink }}" class="post_comments" title="{{ post.comments.1 }} {% if post.comments.1 == "1" %}comment{% else %}comments{% endif %}">{{ post.comments.0 }} {% if post.comments.1 == "1" %}comment{% else %}comments{% endif %}</a>
 	</div>
 </div>
 {%- endmacro %}

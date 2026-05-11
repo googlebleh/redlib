@@ -27,7 +27,7 @@ use std::{
 };
 use time::OffsetDateTime;
 
-use crate::{config, dbg_msg};
+use crate::{config, dbg_msg, utils};
 
 const BANNED_USER_AGENTS: &[&str] = &[
 	"AI2Bot",
@@ -259,7 +259,7 @@ impl ResponseExt for Response<Body> {
 	}
 
 	fn remove_cookie(&mut self, name: String) {
-		let removal_cookie = Cookie::build(name).path("/").http_only(true).expires(OffsetDateTime::now_utc());
+		let removal_cookie = Cookie::build(name).path(utils::cookie_path()).http_only(true).expires(OffsetDateTime::now_utc());
 		if let Ok(val) = header::HeaderValue::from_str(&removal_cookie.to_string()) {
 			self.headers_mut().append("Set-Cookie", val);
 		}
@@ -315,7 +315,7 @@ impl Server {
 			// returns a Response into a `Service`.
 			// let shared_router = router.clone();
 			async move {
-				Ok::<_, String>(service_fn(move |req: Request<Body>| {
+				Ok::<_, String>(service_fn(move |mut req: Request<Body>| {
 					let req_headers = req.headers().clone();
 					let def_headers = default_headers.clone();
 
@@ -338,6 +338,32 @@ impl Server {
 
 					// Remove double slashes and decode encoded slashes
 					let mut path = req.uri().path().replace("//", "/").replace("%2F", "/");
+
+					// If redlib is hosted at a subpath (REDLIB_BASE_PATH), strip the
+					// prefix off the path before any other normalization, and rewrite
+					// the request URI so handler code that inspects req.uri() sees
+					// the post-strip path. This must run before the trailing-slash
+					// trim so that the bare prefix (with or without trailing slash)
+					// doesn't get confused with a sub-path.
+					let prefix = utils::prefix();
+					if !prefix.is_empty() {
+						if let Some(stripped) = path.strip_prefix(&format!("{prefix}/")) {
+							path = format!("/{stripped}");
+							let new_uri_str = match req.uri().query() {
+								Some(q) => format!("{path}?{q}"),
+								None => path.clone(),
+							};
+							if let Ok(new_uri) = new_uri_str.parse::<hyper::Uri>() {
+								*req.uri_mut() = new_uri;
+							}
+						} else if path == prefix {
+							// Bare prefix without trailing slash → redirect to prefix root.
+							return async move { Ok(crate::utils::redirect("/")) }.boxed();
+						} else {
+							// Path is not under the configured base — 404.
+							return new_boilerplate(def_headers, req_headers, 404, Body::from("Nothing here")).boxed();
+						}
+					}
 
 					// Remove trailing slashes
 					if path != "/" && path.ends_with('/') {

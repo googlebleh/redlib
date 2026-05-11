@@ -13,7 +13,7 @@
 
 {% block content %}
 <div id="settings">
-	<form action="/settings" method="POST">
+	<form action="{{ crate::utils::prefix() }}/settings" method="POST">
 		<div class="prefs">
 			<fieldset>
 				<legend>Appearance</legend>
@@ -157,8 +157,8 @@
 			{% let feed -%}
 			{% if sub.starts_with("u_") -%}{% let feed = format!("u/{}", &sub[2..]) -%}{% else -%}{% let feed =
 			format!("r/{}", sub) -%}{% endif -%}
-			<a href="/{{ feed }}">{{ feed }}</a>
-			<form action="/r/{{ sub }}/unsubscribe/?redirect=settings" method="POST">
+			<a href="{{ crate::utils::prefix() }}/{{ feed }}">{{ feed }}</a>
+			<form action="{{ crate::utils::prefix() }}/r/{{ sub }}/unsubscribe/?redirect=settings" method="POST">
 				<button class="unsubscribe">Unsubscribe</button>
 			</form>
 		</div>
@@ -173,8 +173,8 @@
 			{% let feed -%}
 			{% if sub.starts_with("u_") -%}{% let feed = format!("u/{}", &sub[2..]) -%}{% else -%}{% let feed =
 			format!("r/{}", sub) -%}{% endif -%}
-			<a href="/{{ feed }}">{{ feed }}</a>
-			<form action="/r/{{ sub }}/unfilter/?redirect=settings" method="POST">
+			<a href="{{ crate::utils::prefix() }}/{{ feed }}">{{ feed }}</a>
+			<form action="{{ crate::utils::prefix() }}/r/{{ sub }}/unfilter/?redirect=settings" method="POST">
 				<button class="unfilter">Unfilter</button>
 			</form>
 		</div>
@@ -189,14 +189,14 @@
 		{% match prefs.to_urlencoded() %}
 		{% when Ok with (encoded_prefs) %}
 		<p>You can restore your current settings and subscriptions after clearing your cookies using <a
-				href="/settings/restore/?{{ encoded_prefs }}">this link</a>.</p>
+				href="{{ crate::utils::prefix() }}/settings/restore/?{{ encoded_prefs }}">this link</a>.</p>
 		{% when Err with (err) %}
 		<p>There was an error creating your restore link: {{ err }}</p>
 		<p>Please report this issue</p>
 		{% endmatch %}
 		<br />
 		<div>
-			<script src="/copy.js"></script>
+			<script src="{{ crate::utils::prefix() }}/copy.js"></script>
 			<label for="bincode_str">Or, export/import here (be sure to save first):</label>
 			<br />
 			<input type="text" id="bincode_str" name="bincode_str"
@@ -205,7 +205,7 @@
 			<button id="copy" class="copy">Copy</button>
 
 			<br />
-			<form action="/settings/encoded-restore/" method="POST">
+			<form action="{{ crate::utils::prefix() }}/settings/encoded-restore/" method="POST">
 				<input type="text" id="encoded_prefs" name="encoded_prefs" value=""
 					placeholder="Paste your encoded settings here">
 				<button class="import" type="submit">Import</button>

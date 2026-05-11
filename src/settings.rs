@@ -88,7 +88,7 @@ pub async fn set(req: Request<Body>) -> Result<Response<Body>, String> {
 		match form.get(name) {
 			Some(value) => response.insert_cookie(
 				Cookie::build((name.to_owned(), value.clone()))
-					.path("/")
+					.path(crate::utils::cookie_path())
 					.http_only(true)
 					.expires(OffsetDateTime::now_utc() + Duration::weeks(52))
 					.into(),
@@ -134,7 +134,7 @@ fn set_cookies_method(req: Request<Body>, remove_cookies: bool) -> Response<Body
 		match form.get(name) {
 			Some(value) => response.insert_cookie(
 				Cookie::build((name.to_owned(), value.clone()))
-					.path("/")
+					.path(crate::utils::cookie_path())
 					.http_only(true)
 					.expires(OffsetDateTime::now_utc() + Duration::weeks(52))
 					.into(),
@@ -175,7 +175,7 @@ fn set_cookies_method(req: Request<Body>, remove_cookies: bool) -> Response<Body
 
 			response.insert_cookie(
 				Cookie::build((subscriptions_cookie, list))
-					.path("/")
+					.path(crate::utils::cookie_path())
 					.http_only(true)
 					.expires(OffsetDateTime::now_utc() + Duration::weeks(52))
 					.into(),
@@ -226,7 +226,7 @@ fn set_cookies_method(req: Request<Body>, remove_cookies: bool) -> Response<Body
 
 			response.insert_cookie(
 				Cookie::build((filters_cookie, list))
-					.path("/")
+					.path(crate::utils::cookie_path())
 					.http_only(true)
 					.expires(OffsetDateTime::now_utc() + Duration::weeks(52))
 					.into(),

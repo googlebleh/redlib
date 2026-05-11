@@ -41,7 +41,7 @@
 			</form>
 
 			{% if sub.name.contains("+") %}
-				<form action="/r/{{ sub.name }}/subscribe?redirect={{ redirect_url }}" method="POST">
+				<form action="{{ crate::utils::prefix() }}/r/{{ sub.name }}/subscribe?redirect={{ redirect_url }}" method="POST">
 					<button id="multisub" class="subscribe" title="Subscribe to each sub in this multireddit">Subscribe to Multireddit</button>
 				</form>
 			{% endif %}
@@ -65,8 +65,8 @@
 			{% endif %}
 			{% endfor %}
 			{% if prefs.use_hls == "on" %}
-			<script src="/hls.min.js"></script>
-			<script src="/playHLSVideo.js"></script>
+			<script src="{{ crate::utils::prefix() }}/hls.min.js"></script>
+			<script src="{{ crate::utils::prefix() }}/playHLSVideo.js"></script>
 			{% endif %}
 			</div>
 			{% endif %}
@@ -93,7 +93,7 @@
 				{% if sub.wiki %}
 				<div id="top">
 					<div>Posts</div>
-					<a href="/r/{{ sub.name }}/wiki/index">Wiki</a>
+					<a href="{{ crate::utils::prefix() }}/r/{{ sub.name }}/wiki/index">Wiki</a>
 				</div>
 				{% endif %}
 				<div id="sub_meta">
@@ -110,29 +110,29 @@
 					<div id="sub_actions">
 						<div id="sub_subscription">
 							{% if prefs.subscriptions.contains(sub.name) %}
-								<form action="/r/{{ sub.name }}/unsubscribe?redirect={{ redirect_url }}" method="POST">
+								<form action="{{ crate::utils::prefix() }}/r/{{ sub.name }}/unsubscribe?redirect={{ redirect_url }}" method="POST">
 									<button class="unsubscribe">Unsubscribe</button>
 								</form>
 							{% else %}
-								<form action="/r/{{ sub.name }}/subscribe?redirect={{ redirect_url }}" method="POST">
+								<form action="{{ crate::utils::prefix() }}/r/{{ sub.name }}/subscribe?redirect={{ redirect_url }}" method="POST">
 									<button class="subscribe">Subscribe</button>
 								</form>
 							{% endif %}
 						</div>
 						<div id="sub_filter">
 							{% if prefs.filters.contains(sub.name) %}
-								<form action="/r/{{ sub.name }}/unfilter?redirect={{ redirect_url }}" method="POST">
+								<form action="{{ crate::utils::prefix() }}/r/{{ sub.name }}/unfilter?redirect={{ redirect_url }}" method="POST">
 									<button class="unfilter">Unfilter</button>
 								</form>
 							{% else %}
-							<form action="/r/{{ sub.name }}/filter?redirect={{ redirect_url }}" method="POST">
+							<form action="{{ crate::utils::prefix() }}/r/{{ sub.name }}/filter?redirect={{ redirect_url }}" method="POST">
 								<button class="filter">Filter</button>
 							</form>
 							{% endif %}
 						</div>
 						{% if crate::utils::enable_rss() %}
 						<div id="sub_rss">
-                            <a href="/r/{{ sub.name }}.rss" title="RSS feed for r/{{ sub.name }}">
+                            <a href="{{ crate::utils::prefix() }}/r/{{ sub.name }}.rss" title="RSS feed for r/{{ sub.name }}">
                                 <button class="subscribe">RSS feed</button >
                             </a>
 						</div>
@@ -148,7 +148,7 @@
 					<br>
 					<ul>
 					{% for moderator in sub.moderators %}
-					<li><a style="color: var(--accent)" href="/u/{{ moderator }}">{{ moderator }}</a></li>
+					<li><a style="color: var(--accent)" href="{{ crate::utils::prefix() }}/u/{{ moderator }}">{{ moderator }}</a></li>
 					{% endfor %}
 					</ul> #}
 				</div>

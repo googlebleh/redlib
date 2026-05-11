@@ -24,7 +24,7 @@
         {% if post.num_duplicates == 0 %}
             <span class="listing_warn">(No duplicates found)</span>
         {% else if post.flags.nsfw && prefs.show_nsfw != "on" %}
-            <span class="listing_warn">(Enable "Show NSFW posts" in <a href="/settings">settings</a> to show duplicates)</span>
+            <span class="listing_warn">(Enable "Show NSFW posts" in <a href="{{ crate::utils::prefix() }}/settings">settings</a> to show duplicates)</span>
         {% else %}
             <div id="duplicates_msg"><h3>Duplicates</h3></div>
             {% if num_posts_filtered > 0 %}
@@ -60,9 +60,9 @@
                             {% else -%}
                                 {% let community = format!("r/{}", post.community) -%}
                             {% endif -%}
-                            <a class="post_subreddit" href="/r/{{ post.community }}">{{ post.community }}</a>
+                            <a class="post_subreddit" href="{{ crate::utils::prefix() }}/r/{{ post.community }}">{{ post.community }}</a>
                             <span class="dot">&bull;</span>
-                            <a class="post_author {{ post.author.distinguished }}" href="/u/{{ post.author.name }}">u/{{ post.author.name }}</a>
+                            <a class="post_author {{ post.author.distinguished }}" href="{{ crate::utils::prefix() }}/u/{{ post.author.name }}">u/{{ post.author.name }}</a>
                             <span class="dot">&bull;</span>
                             <span class="created" title="{{ post.created }}">{{ post.rel_time }}</span>
                             {% if !post.awards.is_empty() && prefs.hide_awards != "on" %}
@@ -75,12 +75,12 @@
                         </p>
                         <h2 class="post_title">
                             {% if post.flair.flair_parts.len() > 0 %}
-                                <a href="/r/{{ post.community }}/search?q=flair_name%3A%22{{ post.flair.text }}%22&restrict_sr=on"
+                                <a href="{{ crate::utils::prefix() }}/r/{{ post.community }}/search?q=flair_name%3A%22{{ post.flair.text }}%22&restrict_sr=on"
                                     class="post_flair"
                                     style="color:{{ post.flair.foreground_color }}; background:{{ post.flair.background_color }};"
                                     dir="ltr">{% call utils::render_flair(post.flair.flair_parts) %}</a>
                             {% endif %}
-                            <a href="{{ post.permalink }}">{{ post.title }}</a>{% if post.flags.nsfw %} <small class="nsfw">NSFW</small>{% endif %}
+                            <a href="{{ crate::utils::prefix() }}{{ post.permalink }}">{{ post.title }}</a>{% if post.flags.nsfw %} <small class="nsfw">NSFW</small>{% endif %}
                         </h2>
       
                         <div class="post_score" title="{{ post.score.1 }}">
@@ -91,7 +91,7 @@
                           {% endif %}
                         <span class="label"> Upvotes</span></div>
                         <div class="post_footer">
-                            <a href="{{ post.permalink }}" class="post_comments" title="{{ post.comments.1 }} comments">{{ post.comments.0 }} comments</a>
+                            <a href="{{ crate::utils::prefix() }}{{ post.permalink }}" class="post_comments" title="{{ post.comments.1 }} comments">{{ post.comments.0 }} comments</a>
                         </div>
 
                 </div>

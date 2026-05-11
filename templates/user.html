@@ -61,7 +61,7 @@ body %}
                     <summary class="comment_data">
                         <a
                             class="comment_link"
-                            href="{{ post.permalink }}#{{ post.id }}"
+                            href="{{ crate::utils::prefix() }}{{ post.permalink }}#{{ post.id }}"
                             title="{{ post.link_title }}"
                             >{{ post.link_title }}</a
                         >
@@ -69,7 +69,7 @@ body %}
                             <span class="created-in">&nbsp;in&nbsp;</span>
                             <a
                                 class="comment_subreddit"
-                                href="/r/{{ post.community }}"
+                                href="{{ crate::utils::prefix() }}/r/{{ post.community }}"
                                 >r/{{ post.community }}</a
                             >
                             <span class="dot">&bull;</span>
@@ -82,8 +82,8 @@ body %}
                 </details>
             </div>
             {% endif %} {% endfor %} {% if prefs.use_hls == "on" %}
-            <script src="/hls.min.js"></script>
-            <script src="/playHLSVideo.js"></script>
+            <script src="{{ crate::utils::prefix() }}/hls.min.js"></script>
+            <script src="{{ crate::utils::prefix() }}/playHLSVideo.js"></script>
             {% endif %}
         </div>
         {% endif %}
@@ -130,14 +130,14 @@ body %}
                 <div id="user_subscription">
                     {% if prefs.subscriptions.contains(name) %}
                     <form
-                        action="/r/{{ name }}/unsubscribe?redirect={{ redirect_url }}"
+                        action="{{ crate::utils::prefix() }}/r/{{ name }}/unsubscribe?redirect={{ redirect_url }}"
                         method="POST"
                     >
                         <button class="unsubscribe">Unfollow</button>
                     </form>
                     {% else %}
                     <form
-                        action="/r/{{ name }}/subscribe?redirect={{ redirect_url }}"
+                        action="{{ crate::utils::prefix() }}/r/{{ name }}/subscribe?redirect={{ redirect_url }}"
                         method="POST"
                     >
                         <button class="subscribe">Follow</button>
@@ -147,14 +147,14 @@ body %}
                 <div id="user_filter">
                     {% if prefs.filters.contains(name) %}
                     <form
-                        action="/r/{{ name }}/unfilter?redirect={{ redirect_url }}"
+                        action="{{ crate::utils::prefix() }}/r/{{ name }}/unfilter?redirect={{ redirect_url }}"
                         method="POST"
                     >
                         <button class="unfilter">Unfilter</button>
                     </form>
                     {% else %}
                     <form
-                        action="/r/{{ name }}/filter?redirect={{ redirect_url }}"
+                        action="{{ crate::utils::prefix() }}/r/{{ name }}/filter?redirect={{ redirect_url }}"
                         method="POST"
                     >
                         <button class="filter">Filter</button>
@@ -164,7 +164,7 @@ body %}
                 {% if crate::utils::enable_rss() %}
                 <div id="user_rss">
                     <a
-                        href="/u/{{ user.name }}.rss"
+                        href="{{ crate::utils::prefix() }}/u/{{ user.name }}.rss"
                         title="RSS feed for u/{{ user.name }}"
                     >
                         <button class="subscribe">RSS feed</button>

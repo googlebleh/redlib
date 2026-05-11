@@ -38,7 +38,7 @@
 	{% else %}
 	<meta property="og:type" content="website">
 	{% if single_thread %}
-	<script src="/highlighted.js" defer></script>
+	<script src="{{ crate::utils::prefix() }}/highlighted.js" defer></script>
 	{% endif %}
 	{% endif %}
 {% endblock %}
@@ -83,7 +83,7 @@
 		{% for c in comments -%}
 		<div class="thread">
 			{% if single_thread %}
-			<p class="thread_nav"><a href="{{ post.permalink }}">View all comments</a></p>
+			<p class="thread_nav"><a href="{{ crate::utils::prefix() }}{{ post.permalink }}">View all comments</a></p>
 			{% if c.parent_kind == "t1" %}
 			<p class="thread_nav"><a href="?context=9999">Show parent comments</a></p>
 			{% endif %}

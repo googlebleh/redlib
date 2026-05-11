@@ -216,7 +216,7 @@ pub async fn add_quarantine_exception(req: Request<Body>) -> Result<Response<Bod
 	let mut response = redirect(&redir);
 	response.insert_cookie(
 		Cookie::build((&format!("allow_quaran_{}", subreddit.to_lowercase()), "true"))
-			.path("/")
+			.path(crate::utils::cookie_path())
 			.http_only(true)
 			.expires(cookie::Expiration::Session)
 			.into(),
@@ -386,7 +386,7 @@ pub async fn subscriptions_filters(req: Request<Body>) -> Result<Response<Body>,
 
 			response.insert_cookie(
 				Cookie::build((subscriptions_cookie, list))
-					.path("/")
+					.path(crate::utils::cookie_path())
 					.http_only(true)
 					.expires(OffsetDateTime::now_utc() + Duration::weeks(52))
 					.into(),
@@ -434,7 +434,7 @@ pub async fn subscriptions_filters(req: Request<Body>) -> Result<Response<Body>,
 
 			response.insert_cookie(
 				Cookie::build((filters_cookie, list))
-					.path("/")
+					.path(crate::utils::cookie_path())
 					.http_only(true)
 					.expires(OffsetDateTime::now_utc() + Duration::weeks(52))
 					.into(),

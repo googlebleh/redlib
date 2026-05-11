@@ -11,7 +11,7 @@ use hyper::{header::HeaderValue, Body, Request, Response};
 use log::{info, warn};
 use redlib::client::{canonical_path, proxy, rate_limit_check, CLIENT};
 use redlib::server::{self, RequestExt};
-use redlib::utils::{error, redirect, ThemeAssets};
+use redlib::utils::{error, prefix, redirect, ThemeAssets};
 use redlib::{config, duplicates, headers, instance_info, post, search, settings, subreddit, user};
 
 use redlib::client::OAUTH_CLIENT;
@@ -60,6 +60,14 @@ async fn font() -> Result<Response<Body>, String> {
 			.body(include_bytes!("../static/Inter.var.woff2").as_ref().into())
 			.unwrap_or_default(),
 	)
+}
+
+async fn manifest() -> Result<Response<Body>, String> {
+	// Patch the static manifest's `start_url` with the configured base path
+	// so the PWA opens at the correct location when hosted at a subpath.
+	static MANIFEST: LazyLock<String> =
+		LazyLock::new(|| include_str!("../static/manifest.json").replace("\"start_url\": \"/\"", &format!("\"start_url\": \"{}/\"", prefix())));
+	resource(&MANIFEST, "application/json", false).await
 }
 
 async fn opensearch() -> Result<Response<Body>, String> {
@@ -220,9 +228,7 @@ async fn main() {
 
 	// Read static files
 	app.at("/style.css").get(|_| style().boxed());
-	app
-		.at("/manifest.json")
-		.get(|_| resource(include_str!("../static/manifest.json"), "application/json", false).boxed());
+	app.at("/manifest.json").get(|_| manifest().boxed());
 	app.at("/robots.txt").get(|_| {
 		resource(
 			if match config::get_setting("REDLIB_ROBOTS_DISABLE_INDEXING") {

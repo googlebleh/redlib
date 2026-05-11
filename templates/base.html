@@ -20,13 +20,13 @@
 		<!-- Android -->
 		<meta name="mobile-web-app-capable" content="yes">
 		<!-- iOS Logo -->
-		<link href="/touch-icon-iphone.png" rel="apple-touch-icon">
+		<link href="{{ crate::utils::prefix() }}/touch-icon-iphone.png" rel="apple-touch-icon">
 		<!-- OpenSearch description file -->
-		<link rel="search" type="application/opensearchdescription+xml" title="Search Redlib" href="/opensearch.xml">
+		<link rel="search" type="application/opensearchdescription+xml" title="Search Redlib" href="{{ crate::utils::prefix() }}/opensearch.xml">
 		<!-- PWA Manifest -->
-		<link rel="manifest" type="application/json" href="/manifest.json">
-		<link rel="shortcut icon" type="image/x-icon" href="/favicon.ico"> 
-		<link rel="stylesheet" type="text/css" href="/style.css?v={{ env!("CARGO_PKG_VERSION") }}">
+		<link rel="manifest" type="application/json" href="{{ crate::utils::prefix() }}/manifest.json">
+		<link rel="shortcut icon" type="image/x-icon" href="{{ crate::utils::prefix() }}/favicon.ico"> 
+		<link rel="stylesheet" type="text/css" href="{{ crate::utils::prefix() }}/style.css?v={{ env!("CARGO_PKG_VERSION") }}">
 		<!-- Video quality -->
 		<div id="video_quality" data-value="{{ prefs.video_quality }}"></div>
 		{% endblock %}
@@ -40,7 +40,7 @@
 		<nav class="
 			{% if prefs.fixed_navbar == "on" %} fixed_navbar{% endif %}">
 			<div id="logo">
-				<a id="redlib" href="/"><span id="red">red</span><span id="lib">lib.</span></a>
+				<a id="redlib" href="{{ crate::utils::prefix() }}/"><span id="red">red</span><span id="lib">lib.</span></a>
 				{% block subscriptions %}{% endblock %}
 			</div>
 			{% block search %}{% endblock %}
@@ -55,7 +55,7 @@
 				{% if prefs.disable_visit_reddit_confirmation != "on" %}
 					{% call utils::visit_reddit_confirmation(url) %}
 				{% endif %}
-				<a id="settings_link" href="/settings">
+				<a id="settings_link" href="{{ crate::utils::prefix() }}/settings">
 					<span>settings</span>
 					<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
 						<title>settings</title>
@@ -77,7 +77,7 @@
 		{% block footer %}
 			<footer>
 				<div class="footer-buttons">
-					<p><span id="version">v{{ env!("CARGO_PKG_VERSION") }}&emsp;</span><a href="/info" title="View instance information">ⓘ View instance info</a>&emsp;<a href="https://github.com/redlib-org/redlib" title="View code on GitHub">&lt;&gt; Code</a></p>
+					<p><span id="version">v{{ env!("CARGO_PKG_VERSION") }}&emsp;</span><a href="{{ crate::utils::prefix() }}/info" title="View instance information">ⓘ View instance info</a>&emsp;<a href="https://github.com/redlib-org/redlib" title="View code on GitHub">&lt;&gt; Code</a></p>
 				</div>
 			</footer>
 		{% endblock %}
