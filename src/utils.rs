@@ -1069,14 +1069,7 @@ pub fn format_url(url: &str) -> String {
 				_ => url.to_string(),
 			}
 		});
-		// Prefix in-app paths (those starting with '/') with REDLIB_BASE_PATH so
-		// they resolve correctly when redlib is hosted at a subpath. External
-		// URLs are returned unchanged.
-		if result.starts_with('/') {
-			format!("{}{result}", prefix())
-		} else {
-			result
-		}
+		with_prefix(&result)
 	}
 }
 
@@ -1098,12 +1091,17 @@ static REDDIT_EMOJI_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"https
 static REDLIB_PREVIEW_LINK_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"/(img|preview/)(pre|external-pre)?/(.*?)>"#).unwrap());
 static REDLIB_PREVIEW_TEXT_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r">(.*?)</a>").unwrap());
 
+// Reddit markdown sometimes contains already-relative paths (e.g. a sidebar
+// link written as `[r/aww](/r/aww)`); prefix these so they resolve correctly
+// under REDLIB_BASE_PATH. No-op when no prefix is configured.
+static REDDIT_RELATIVE_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"href="/(r|u|user|comments)/"#).unwrap());
+
 /// Rewrite Reddit links to Redlib in body of text
 pub fn rewrite_urls(input_text: &str) -> String {
 	let reddit_link_replacement = format!(r#"href="{}/"#, prefix());
-	let mut text1 =
-		// Rewrite Reddit links to Redlib
-		REDDIT_REGEX.replace_all(input_text, reddit_link_replacement.as_str()).to_string();
+	let relative_link_replacement = format!(r#"href="{}/$1/"#, prefix());
+	let mut text1 = REDDIT_REGEX.replace_all(input_text, reddit_link_replacement.as_str()).to_string();
+	text1 = REDDIT_RELATIVE_REGEX.replace_all(&text1, relative_link_replacement.as_str()).to_string();
 
 	loop {
 		if REDDIT_EMOJI_REGEX.find(&text1).is_none() {
@@ -1125,14 +1123,12 @@ pub fn rewrite_urls(input_text: &str) -> String {
 		} else {
 			let formatted_url = format_url(REDDIT_PREVIEW_REGEX.find(&text1).map(|x| x.as_str()).unwrap_or_default());
 
-			// `formatted_url` has the base path prepended by format_url, but the
-			// regex below captures only from `/img/` or `/preview/` onwards.
-			// Re-add the prefix so the subsequent str-replace matches the
-			// prefix-prepended text1.
-			let image_url_owned = REDLIB_PREVIEW_LINK_REGEX
+			// Regex captures only from `/img/` or `/preview/` onwards, dropping
+			// the base path that format_url prepended. Re-add it so the
+			// subsequent str-replace matches the prefix-prepended text1.
+			let image_url = REDLIB_PREVIEW_LINK_REGEX
 				.find(&formatted_url)
 				.map_or(String::new(), |m| format!("{}{}", prefix(), m.as_str()));
-			let image_url = image_url_owned.as_str();
 			let mut image_caption = REDLIB_PREVIEW_TEXT_REGEX.find(&formatted_url).map_or("", |m| m.as_str());
 
 			/* As long as image_caption isn't empty remove first and last four characters of image_text to leave us with just the text in the caption without any HTML.

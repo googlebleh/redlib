@@ -417,6 +417,7 @@ Assign a default value for each instance-specific setting by passing environment
 | `PORT`                    | Integer 0-65535 | `8080`                 | The **internal** port Redlib listens on.                                                                  |
 | `ENABLE_RSS`              | `["on", "off"]` | `off`                  | Enables RSS feed generation.                                                                              |
 | `FULL_URL`                | String          | (empty)                | Allows for proper URLs (for now, only needed by RSS)                                                      |
+| `BASE_PATH`               | String          | (empty)                | Host redlib under a sub-path (e.g. `/redlib`) so it can sit behind a reverse proxy that routes a portion of a host's namespace to it. Leading slash, no trailing slash. |
 
 ## Default user settings
 
