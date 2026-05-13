@@ -1507,7 +1507,8 @@ pub fn to_absolute_url(relative_path: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-	use super::{deflate_compress, deflate_decompress, format_num, format_url, render_bullet_lists, rewrite_emotes, rewrite_urls, url_path_basename, Post, Preferences};
+	use super::{cookie_path, deflate_compress, deflate_decompress, format_num, format_url, prefix, render_bullet_lists, rewrite_emotes, rewrite_urls, url_path_basename, with_prefix, Post, Preferences};
+	use sealed_test::prelude::*;
 
 	#[test]
 	fn format_num_works() {
@@ -1742,5 +1743,137 @@ How`s your monitor by the way? Any IPS bleed whatsoever? I either got lucky or t
 		let decompressed = if compression { deflate_decompress(compressed).unwrap() } else { compressed };
 		let deserialized: Preferences = bincode::deserialize(&decompressed).unwrap();
 		assert_eq!(*input, deserialized);
+	}
+
+	#[test]
+	fn test_prefix_unset() {
+		assert_eq!(prefix(), "");
+	}
+
+	#[test]
+	#[sealed_test(env = [("REDLIB_BASE_PATH", "")])]
+	fn test_prefix_empty() {
+		assert_eq!(prefix(), "");
+	}
+
+	#[test]
+	#[sealed_test(env = [("REDLIB_BASE_PATH", "/")])]
+	fn test_prefix_just_slash() {
+		assert_eq!(prefix(), "");
+	}
+
+	#[test]
+	#[sealed_test(env = [("REDLIB_BASE_PATH", "/redlib")])]
+	fn test_prefix_leading_slash() {
+		assert_eq!(prefix(), "/redlib");
+	}
+
+	#[test]
+	#[sealed_test(env = [("REDLIB_BASE_PATH", "redlib")])]
+	fn test_prefix_no_leading_slash() {
+		assert_eq!(prefix(), "/redlib");
+	}
+
+	#[test]
+	#[sealed_test(env = [("REDLIB_BASE_PATH", "/redlib/")])]
+	fn test_prefix_trailing_slash() {
+		assert_eq!(prefix(), "/redlib");
+	}
+
+	#[test]
+	#[sealed_test(env = [("REDLIB_BASE_PATH", "  /redlib/  ")])]
+	fn test_prefix_whitespace() {
+		assert_eq!(prefix(), "/redlib");
+	}
+
+	#[test]
+	#[sealed_test(env = [("REDLIB_BASE_PATH", "/redlib/sub")])]
+	fn test_prefix_multi_segment() {
+		assert_eq!(prefix(), "/redlib/sub");
+	}
+
+	#[test]
+	fn test_cookie_path_unset() {
+		assert_eq!(cookie_path(), "/");
+	}
+
+	#[test]
+	#[sealed_test(env = [("REDLIB_BASE_PATH", "/redlib")])]
+	fn test_cookie_path_set() {
+		assert_eq!(cookie_path(), "/redlib");
+	}
+
+	#[test]
+	fn test_with_prefix_unset() {
+		assert_eq!(with_prefix("/r/rust"), "/r/rust");
+		assert_eq!(with_prefix(""), "");
+		assert_eq!(with_prefix("https://example.com/x"), "https://example.com/x");
+	}
+
+	#[test]
+	#[sealed_test(env = [("REDLIB_BASE_PATH", "/redlib")])]
+	fn test_with_prefix_set() {
+		// Absolute in-app paths get the prefix
+		assert_eq!(with_prefix("/r/rust"), "/redlib/r/rust");
+		assert_eq!(with_prefix("/img/foo.jpg"), "/redlib/img/foo.jpg");
+		// External URLs (not starting with `/`) are left alone
+		assert_eq!(with_prefix("https://example.com/x"), "https://example.com/x");
+		// Empty path is a no-op
+		assert_eq!(with_prefix(""), "");
+	}
+
+	#[test]
+	#[sealed_test(env = [("REDLIB_BASE_PATH", "/redlib")])]
+	fn test_format_url_prefixed() {
+		// Same media URLs as test_format_url, now expecting the configured prefix.
+		assert_eq!(format_url("https://i.redd.it/foobar.jpg"), "/redlib/img/foobar.jpg");
+		assert_eq!(format_url("https://a.thumbs.redditmedia.com/XYZ.jpg"), "/redlib/thumb/a/XYZ.jpg");
+		assert_eq!(format_url("https://v.redd.it/foo/DASH_360.mp4?source=fallback"), "/redlib/vid/foo/360.mp4");
+		assert_eq!(
+			format_url("https://preview.redd.it/qwerty.jpg?auto=webp&s=asdf"),
+			"/redlib/preview/pre/qwerty.jpg?auto=webp&s=asdf"
+		);
+		assert_eq!(format_url("https://www.redditstatic.com/gold/awards/icon/icon.png"), "/redlib/static/gold/awards/icon/icon.png");
+
+		// Sentinel inputs still produce empty strings (no prefixing).
+		assert_eq!(format_url(""), "");
+		assert_eq!(format_url("self"), "");
+		assert_eq!(format_url("default"), "");
+		assert_eq!(format_url("nsfw"), "");
+		assert_eq!(format_url("spoiler"), "");
+	}
+
+	#[test]
+	#[sealed_test(env = [("REDLIB_BASE_PATH", "/redlib")])]
+	fn test_rewrite_urls_prefixed_reddit_links() {
+		// Absolute reddit links get rewritten under the prefix.
+		assert_eq!(
+			rewrite_urls("<a href=\"https://new.reddit.com/r/linux_gaming/comments/x/just_a_test/\">label</a>"),
+			"<a href=\"/redlib/r/linux_gaming/comments/x/just_a_test/\">label</a>"
+		);
+	}
+
+	#[test]
+	#[sealed_test(env = [("REDLIB_BASE_PATH", "/redlib")])]
+	fn test_rewrite_urls_prefixed_relative_paths() {
+		// Reddit markdown sometimes contains already-relative paths (sidebar links,
+		// user mentions, etc.); these should be prefixed.
+		assert_eq!(rewrite_urls(r#"<a href="/r/aww">/r/aww</a>"#), r#"<a href="/redlib/r/aww">/r/aww</a>"#);
+		assert_eq!(rewrite_urls(r#"<a href="/u/spez">/u/spez</a>"#), r#"<a href="/redlib/u/spez">/u/spez</a>"#);
+		assert_eq!(rewrite_urls(r#"<a href="/user/spez">/user/spez</a>"#), r#"<a href="/redlib/user/spez">/user/spez</a>"#);
+		assert_eq!(
+			rewrite_urls(r#"<a href="/comments/abc123/">link</a>"#),
+			r#"<a href="/redlib/comments/abc123/">link</a>"#
+		);
+	}
+
+	#[test]
+	#[sealed_test(env = [("REDLIB_BASE_PATH", "/redlib")])]
+	fn test_rewrite_urls_prefixed_image_link() {
+		// Inline image preview also picks up the prefix in both the href and src.
+		let input =
+			r#"<p><a href="https://preview.redd.it/6awags382xo31.png?width=2560&amp;format=png&amp;auto=webp&amp;s=9c563aed4f07a91bdd249b5a3cea43a79710dcfc">caption 1</a></p>"#;
+		let output = r#"<figure><a href="/redlib/preview/pre/6awags382xo31.png?width=2560&amp;format=png&amp;auto=webp&amp;s=9c563aed4f07a91bdd249b5a3cea43a79710dcfc"><img loading="lazy" src="/redlib/preview/pre/6awags382xo31.png?width=2560&amp;format=png&amp;auto=webp&amp;s=9c563aed4f07a91bdd249b5a3cea43a79710dcfc"></a><figcaption>caption 1</figcaption></figure>"#;
+		assert_eq!(rewrite_urls(input), output);
 	}
 }
