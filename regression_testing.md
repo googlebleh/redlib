@@ -92,3 +92,18 @@ In this environment, "no regression introduced" is established when:
 3. The feature branch's diff doesn't touch source files relevant to the failing tests' codepath.
 
 Failing to meet (2) or (3) is the only signal worth chasing. A red suite is not, on its own.
+
+## Coverage tooling note
+
+When measuring coverage with `cargo tarpaulin`, **use `--engine llvm`**, not the default ptrace engine.
+
+Many tests in this repo (notably `config::tests::*` and the prefix-related `utils::tests::*`) use `sealed_test` for env-var isolation. `sealed_test` forks per test. The ptrace engine doesn't merge coverage from forked subprocesses, so every `#[sealed_test]`-annotated test is invisible to it — coverage reports come out misleadingly low (~15% vs ~31% with llvm on the current suite). LLVM source-based instrumentation handles the fork correctly because each child writes its own profile data that gets merged at the end.
+
+Example run (also skipping live-network tests to avoid Reddit rate-limit pressure):
+
+```bash
+cargo tarpaulin --lib --engine llvm --exclude-files 'target/*' --out Stdout \
+  -- --skip test_fetching --skip test_oauth_ --skip test_mobile_spoof \
+     --skip test_generic_web --skip test_rate_limit --skip test_localization \
+     --skip test_obfuscated --skip test_private_sub --skip test_banned_sub --skip test_gated
+```
