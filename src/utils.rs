@@ -1507,8 +1507,47 @@ pub fn to_absolute_url(relative_path: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-	use super::{cookie_path, deflate_compress, deflate_decompress, format_num, format_url, prefix, render_bullet_lists, rewrite_emotes, rewrite_urls, url_path_basename, with_prefix, Post, Preferences};
+	use super::{
+		cookie_path, deflate_compress, deflate_decompress, format_num, format_url, prefix, render_bullet_lists, rewrite_emotes, rewrite_urls, url_path_basename, with_prefix, Author, Awards,
+		Comment, Flair, Post, Preferences,
+	};
+	use askama::Template;
 	use sealed_test::prelude::*;
+
+	fn render_more_comment(post_link: &str, parent_id: &str, more_count: i64) -> String {
+		Comment {
+			id: String::new(),
+			kind: "more".to_string(),
+			parent_id: parent_id.to_string(),
+			parent_kind: "t1".to_string(),
+			post_link: post_link.to_string(),
+			post_author: String::new(),
+			body: String::new(),
+			author: Author {
+				name: String::new(),
+				flair: Flair {
+					flair_parts: Vec::new(),
+					text: String::new(),
+					background_color: String::new(),
+					foreground_color: String::new(),
+				},
+				distinguished: String::new(),
+			},
+			score: (String::new(), String::new()),
+			rel_time: String::new(),
+			created: String::new(),
+			edited: (String::new(), String::new()),
+			replies: Vec::new(),
+			highlighted: false,
+			awards: Awards(Vec::new()),
+			collapsed: false,
+			is_filtered: false,
+			more_count,
+			prefs: Preferences::default(),
+		}
+		.render()
+		.unwrap()
+	}
 
 	#[test]
 	fn format_num_works() {
@@ -1865,6 +1904,30 @@ How`s your monitor by the way? Any IPS bleed whatsoever? I either got lucky or t
 			rewrite_urls(r#"<a href="/comments/abc123/">link</a>"#),
 			r#"<a href="/redlib/comments/abc123/">link</a>"#
 		);
+	}
+
+	#[test]
+	#[sealed_test(env = [("REDLIB_BASE_PATH", "/redlib")])]
+	fn test_more_replies_link_prefixed() {
+		// "More replies" thread-expansion links are rendered straight from the
+		// reddit-supplied permalink in `post_link`. Confirm the template prepends
+		// REDLIB_BASE_PATH so the link stays within the configured subpath.
+		let rendered = render_more_comment("/r/aww/comments/abc/title/", "parent42", 3);
+		assert!(
+			rendered.contains(r#"href="/redlib/r/aww/comments/abc/title/parent42""#),
+			"expected prefixed deeper_replies href, got: {rendered}"
+		);
+	}
+
+	#[test]
+	fn test_more_replies_link_no_prefix() {
+		// With REDLIB_BASE_PATH unset, the link is just the raw permalink + parent_id.
+		let rendered = render_more_comment("/r/aww/comments/abc/title/", "parent42", 3);
+		assert!(
+			rendered.contains(r#"href="/r/aww/comments/abc/title/parent42""#),
+			"expected unprefixed deeper_replies href, got: {rendered}"
+		);
+		assert!(!rendered.contains("/redlib/"), "no-prefix render should not contain /redlib/: {rendered}");
 	}
 
 	#[test]
