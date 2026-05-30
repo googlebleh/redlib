@@ -1486,18 +1486,22 @@ pub fn url_path_basename(path: &str) -> String {
 	}
 }
 
-/// Returns the absolute URL of a post, as needed by RSS feeds
+/// Returns the absolute URL of a post, as needed by RSS feeds.
+///
+/// Reddit-supplied paths (`post.permalink`, `post.out_url` when relative) are
+/// in-app paths and must be prefixed with REDLIB_BASE_PATH before being turned
+/// into an absolute URL. External `out_url`s are passed through unchanged.
 pub fn get_post_url(post: &Post) -> String {
 	match post.post_type.as_str() {
-		"image" | "gallery" | "gif" | "video" => return to_absolute_url(&post.permalink),
+		"image" | "gallery" | "gif" | "video" => return to_absolute_url(&with_prefix(&post.permalink)),
 		_ => {}
 	}
 
 	if let Some(out_url) = &post.out_url {
-		return if out_url.starts_with("/r/") { to_absolute_url(out_url) } else { out_url.clone() };
+		return if out_url.starts_with("/r/") { to_absolute_url(&with_prefix(out_url)) } else { out_url.clone() };
 	}
 
-	to_absolute_url(&post.permalink)
+	to_absolute_url(&with_prefix(&post.permalink))
 }
 
 /// Returns an absolute URL given a relative URL, as needed by RSS feeds
@@ -1506,13 +1510,50 @@ pub fn to_absolute_url(relative_path: &str) -> String {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
 	use super::{
-		cookie_path, deflate_compress, deflate_decompress, format_num, format_url, prefix, render_bullet_lists, rewrite_emotes, rewrite_urls, url_path_basename, with_prefix, Author, Awards,
-		Comment, Flair, Post, Preferences,
+		cookie_path, deflate_compress, deflate_decompress, format_num, format_url, get_post_url, prefix, render_bullet_lists, rewrite_emotes, rewrite_urls, url_path_basename, with_prefix, Author,
+		Awards, Comment, Flags, Flair, Media, Post, Preferences,
 	};
 	use askama::Template;
 	use sealed_test::prelude::*;
+
+	/// Minimal Post used by render/get_post_url tests. Only the fields these
+	/// tests actually read need to vary; everything else is empty defaults.
+	pub(crate) fn empty_post() -> Post {
+		Post {
+			id: String::new(),
+			title: String::new(),
+			community: String::new(),
+			body: String::new(),
+			author: Author {
+				name: String::new(),
+				flair: Flair { flair_parts: Vec::new(), text: String::new(), background_color: String::new(), foreground_color: String::new() },
+				distinguished: String::new(),
+			},
+			permalink: String::new(),
+			link_title: String::new(),
+			poll: None,
+			score: (String::new(), String::new()),
+			upvote_ratio: 0,
+			post_type: String::new(),
+			flair: Flair { flair_parts: Vec::new(), text: String::new(), background_color: String::new(), foreground_color: String::new() },
+			flags: Flags { spoiler: false, nsfw: false, stickied: false },
+			thumbnail: Media { url: String::new(), alt_url: String::new(), width: 0, height: 0, poster: String::new(), download_name: String::new() },
+			media: Media { url: String::new(), alt_url: String::new(), width: 0, height: 0, poster: String::new(), download_name: String::new() },
+			domain: String::new(),
+			rel_time: String::new(),
+			created: String::new(),
+			created_ts: 0,
+			num_duplicates: 0,
+			comments: (String::new(), String::new()),
+			gallery: Vec::new(),
+			awards: Awards(Vec::new()),
+			nsfw: false,
+			out_url: None,
+			ws_url: String::new(),
+		}
+	}
 
 	fn render_more_comment(post_link: &str, parent_id: &str, more_count: i64) -> String {
 		Comment {
@@ -1928,6 +1969,60 @@ How`s your monitor by the way? Any IPS bleed whatsoever? I either got lucky or t
 			"expected unprefixed deeper_replies href, got: {rendered}"
 		);
 		assert!(!rendered.contains("/redlib/"), "no-prefix render should not contain /redlib/: {rendered}");
+	}
+
+	#[test]
+	#[sealed_test(env = [("REDLIB_BASE_PATH", "/redlib"), ("REDLIB_FULL_URL", "https://example.com")])]
+	fn test_get_post_url_prefixes_permalink_for_self_post() {
+		// Self/text posts (post_type "" via the default fallthrough) link to the
+		// reddit-supplied permalink; the absolute URL must include the base path.
+		let mut post = empty_post();
+		post.permalink = "/r/rust/comments/abc/title/".to_string();
+		assert_eq!(get_post_url(&post), "https://example.com/redlib/r/rust/comments/abc/title/");
+	}
+
+	#[test]
+	#[sealed_test(env = [("REDLIB_BASE_PATH", "/redlib"), ("REDLIB_FULL_URL", "https://example.com")])]
+	fn test_get_post_url_prefixes_permalink_for_media_post() {
+		// image/video/gif/gallery posts go through the early-return branch.
+		for kind in ["image", "video", "gif", "gallery"] {
+			let mut post = empty_post();
+			post.post_type = kind.to_string();
+			post.permalink = "/r/aww/comments/xyz/cat/".to_string();
+			assert_eq!(
+				get_post_url(&post),
+				"https://example.com/redlib/r/aww/comments/xyz/cat/",
+				"post_type={kind}"
+			);
+		}
+	}
+
+	#[test]
+	#[sealed_test(env = [("REDLIB_BASE_PATH", "/redlib"), ("REDLIB_FULL_URL", "https://example.com")])]
+	fn test_get_post_url_prefixes_relative_out_url() {
+		// out_url that's a relative reddit path (crossposts) should be prefixed.
+		let mut post = empty_post();
+		post.out_url = Some("/r/other/comments/qqq/".to_string());
+		assert_eq!(get_post_url(&post), "https://example.com/redlib/r/other/comments/qqq/");
+	}
+
+	#[test]
+	#[sealed_test(env = [("REDLIB_BASE_PATH", "/redlib"), ("REDLIB_FULL_URL", "https://example.com")])]
+	fn test_get_post_url_preserves_external_out_url() {
+		// Absolute out_url (link posts to external sites) must pass through
+		// unchanged — the prefix is for in-app paths only.
+		let mut post = empty_post();
+		post.out_url = Some("https://crates.io/crates/serde".to_string());
+		assert_eq!(get_post_url(&post), "https://crates.io/crates/serde");
+	}
+
+	#[test]
+	#[sealed_test(env = [("REDLIB_FULL_URL", "https://example.com")])]
+	fn test_get_post_url_no_prefix_unchanged() {
+		// With REDLIB_BASE_PATH unset, behavior is unchanged.
+		let mut post = empty_post();
+		post.permalink = "/r/rust/comments/abc/title/".to_string();
+		assert_eq!(get_post_url(&post), "https://example.com/r/rust/comments/abc/title/");
 	}
 
 	#[test]

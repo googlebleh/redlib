@@ -252,3 +252,66 @@ fn build_comment(
 		prefs: Preferences::new(req),
 	}
 }
+
+#[cfg(test)]
+mod tests {
+	use super::PostTemplate;
+	use crate::utils::{tests::empty_post, Preferences};
+	use askama::Template;
+	use sealed_test::prelude::*;
+
+	fn render_post_template(permalink: &str, comment_query: &str, url_without_query: &str) -> String {
+		let mut post = empty_post();
+		post.permalink = permalink.to_string();
+		PostTemplate {
+			comments: Vec::new(),
+			post,
+			sort: String::new(),
+			prefs: Preferences::default(),
+			single_thread: false,
+			url: String::new(),
+			url_without_query: url_without_query.to_string(),
+			comment_query: comment_query.to_string(),
+		}
+		.render()
+		.unwrap()
+	}
+
+	#[test]
+	#[sealed_test(env = [("REDLIB_BASE_PATH", "/redlib")])]
+	fn test_post_meta_canonical_urls_prefixed() {
+		// og:url and twitter:url are rendered from post.permalink (a reddit-supplied
+		// path); they must include the base path so external crawlers don't 404.
+		let rendered = render_post_template("/r/rust/comments/abc/title/", "", "");
+		assert!(
+			rendered.contains(r#"<meta property="og:url" content="/redlib/r/rust/comments/abc/title/">"#),
+			"expected prefixed og:url"
+		);
+		assert!(
+			rendered.contains(r#"<meta property="twitter:url" content="/redlib/r/rust/comments/abc/title/">"#),
+			"expected prefixed twitter:url"
+		);
+	}
+
+	#[test]
+	#[sealed_test(env = [("REDLIB_BASE_PATH", "/redlib")])]
+	fn test_all_comments_link_prefixed() {
+		// `url_without_query` is computed from req.uri() *after* the base-path
+		// middleware strips the prefix, so the template must re-add it for the
+		// "All comments" link to stay within the subpath.
+		let rendered = render_post_template("/r/rust/comments/abc/title/", "needle", "/r/rust/comments/abc/title/");
+		assert!(
+			rendered.contains(r#"<a id="allCommentsLink" href="/redlib/r/rust/comments/abc/title/">"#),
+			"expected prefixed allCommentsLink"
+		);
+	}
+
+	#[test]
+	fn test_post_canonical_urls_no_prefix() {
+		// With REDLIB_BASE_PATH unset, urls are the raw permalink / url_without_query.
+		let rendered = render_post_template("/r/rust/comments/abc/title/", "needle", "/r/rust/comments/abc/title/");
+		assert!(rendered.contains(r#"<meta property="og:url" content="/r/rust/comments/abc/title/">"#));
+		assert!(rendered.contains(r#"<a id="allCommentsLink" href="/r/rust/comments/abc/title/">"#));
+		assert!(!rendered.contains("/redlib/"), "no-prefix render should not contain /redlib/");
+	}
+}

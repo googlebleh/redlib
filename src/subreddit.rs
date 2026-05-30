@@ -604,7 +604,7 @@ pub async fn rss(req: Request<Body>) -> Result<Response<Body>, String> {
 	let path = format!("/r/{sub}/{sort}.json?{}", req.uri().query().unwrap_or_default());
 
 	// Get subreddit link
-	let subreddit_link: String = format!("{}/r/{sub}", config::get_setting("REDLIB_FULL_URL").unwrap_or_default());
+	let subreddit_link: String = rss_subreddit_link(&sub);
 
 	// Get subreddit data
 	let subreddit = subreddit(&sub, false).await?;
@@ -627,7 +627,7 @@ pub async fn rss(req: Request<Body>) -> Result<Response<Body>, String> {
 						author: Some(post.author.name.to_string()),
 						content: Some(rewrite_urls(&decode_html(&post.body).unwrap())),
 						pub_date: Some(DateTime::from_timestamp(post.created_ts as i64, 0).unwrap_or_default().to_rfc2822()),
-						description: Some(format!("<a href='{}'>Comments</a>", to_absolute_url(&post.permalink))),
+						description: Some(format!("<a href='{}'>Comments</a>", to_absolute_url(&utils::with_prefix(&post.permalink)))),
 						..Default::default()
 					};
 
@@ -648,6 +648,13 @@ pub async fn rss(req: Request<Body>) -> Result<Response<Body>, String> {
 	Ok(res)
 }
 
+/// Builds the absolute subreddit URL used as an RSS channel `<link>`. The
+/// REDLIB_BASE_PATH prefix is included so the link resolves on instances
+/// hosted at a subpath.
+fn rss_subreddit_link(sub: &str) -> String {
+	format!("{}{}/r/{sub}", config::get_setting("REDLIB_FULL_URL").unwrap_or_default(), utils::prefix())
+}
+
 // Set enclosure image for RSS feed item
 fn apply_enclosure(item: &mut Item, post: &Post) {
 	item.set_enclosure(get_rss_image(&post));
@@ -657,7 +664,7 @@ fn apply_enclosure(item: &mut Item, post: &Post) {
 	if post.post_type == "gallery" && post.gallery.len() > 1 {
 		item.set_description(
 			format!("<a href='{}'>Gallery with {} images</a>",
-				to_absolute_url(&post.permalink),
+				to_absolute_url(&utils::with_prefix(&post.permalink)),
 				post.gallery.len()
 			)
 		);
@@ -718,6 +725,7 @@ fn get_mime_type(url: &str) -> &'static str {
 #[cfg(test)]
 mod tests {
 	use super::*;
+	use sealed_test::prelude::*;
 
 	#[tokio::test(flavor = "multi_thread")]
 	async fn test_fetching_subreddit() {
@@ -731,5 +739,17 @@ mod tests {
 		assert!(quarantined.is_ok());
 		let gated = subreddit("drugs", true).await;
 		assert!(gated.is_ok());
+	}
+
+	#[test]
+	#[sealed_test(env = [("REDLIB_BASE_PATH", "/redlib"), ("REDLIB_FULL_URL", "https://example.com")])]
+	fn test_rss_subreddit_link_prefixed() {
+		assert_eq!(rss_subreddit_link("rust"), "https://example.com/redlib/r/rust");
+	}
+
+	#[test]
+	#[sealed_test(env = [("REDLIB_FULL_URL", "https://example.com")])]
+	fn test_rss_subreddit_link_no_prefix() {
+		assert_eq!(rss_subreddit_link("rust"), "https://example.com/r/rust");
 	}
 }

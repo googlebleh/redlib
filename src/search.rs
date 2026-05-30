@@ -190,3 +190,68 @@ async fn search_subreddits(q: &str, typed: &str) -> Vec<Subreddit> {
 		})
 		.collect::<Vec<Subreddit>>()
 }
+
+#[cfg(test)]
+mod tests {
+	use super::{SearchParams, SearchTemplate, Subreddit};
+	use crate::utils::Preferences;
+	use askama::Template;
+	use sealed_test::prelude::*;
+
+	fn render_search_with_one_subreddit(url: &str) -> String {
+		SearchTemplate {
+			posts: Vec::new(),
+			subreddits: vec![Subreddit {
+				name: "rust".to_string(),
+				url: url.to_string(),
+				icon: String::new(),
+				description: String::new(),
+				subscribers: ("0".to_string(), "0".to_string()),
+			}],
+			sub: String::new(),
+			params: SearchParams {
+				q: "rust".to_string(),
+				sort: "relevance".to_string(),
+				t: String::new(),
+				before: String::new(),
+				after: String::new(),
+				restrict_sr: String::new(),
+				typed: String::new(),
+			},
+			prefs: Preferences::default(),
+			url: "/search?q=rust".to_string(),
+			is_filtered: false,
+			all_posts_filtered: false,
+			all_posts_hidden_nsfw: false,
+			no_posts: true,
+		}
+		.render()
+		.unwrap()
+	}
+
+	#[test]
+	#[sealed_test(env = [("REDLIB_BASE_PATH", "/redlib")])]
+	fn test_search_subreddit_result_link_prefixed() {
+		// Subreddit search results render `subreddit.url` (a reddit-supplied
+		// path like "/r/rust/") straight into the href. Confirm the template
+		// prepends REDLIB_BASE_PATH so the link stays within the subpath.
+		let rendered = render_search_with_one_subreddit("/r/rust/");
+		assert!(
+			rendered.contains(r#"href="/redlib/r/rust/" class="search_subreddit""#),
+			"expected prefixed search_subreddit href, got HTML containing: {}",
+			rendered.lines().find(|l| l.contains("search_subreddit\"")).unwrap_or("(no search_subreddit link)")
+		);
+	}
+
+	#[test]
+	fn test_search_subreddit_result_link_no_prefix() {
+		// With REDLIB_BASE_PATH unset, the href should be the bare reddit path.
+		let rendered = render_search_with_one_subreddit("/r/rust/");
+		assert!(
+			rendered.contains(r#"href="/r/rust/" class="search_subreddit""#),
+			"expected unprefixed search_subreddit href, got HTML containing: {}",
+			rendered.lines().find(|l| l.contains("search_subreddit\"")).unwrap_or("(no search_subreddit link)")
+		);
+		assert!(!rendered.contains("/redlib/"), "no-prefix render should not contain /redlib/");
+	}
+}
