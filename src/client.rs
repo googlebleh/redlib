@@ -1,7 +1,7 @@
 use crate::dbg_msg;
 use crate::oauth::{force_refresh_token, token_daemon, Oauth, OauthBackendImpl};
 use crate::server::RequestExt;
-use crate::utils::{format_url, prefix, Post};
+use crate::utils::{format_url, param, prefix, Post};
 use arc_swap::ArcSwap;
 use cached::proc_macro::cached;
 use futures_lite::future::block_on;
@@ -418,10 +418,11 @@ pub async fn json(path: String, quarantine: bool) -> Result<Value, String> {
 		Err(format!("{msg}: {e} | {path}"))
 	};
 
-	// While the comments API is blocked, skip straight to scraping instead of wasting a request
+	// While the comments API is blocked, skip straight to scraping instead of wasting a request.
+	// Cursors come from scraped pages' "More comments" links, which only the scraper understands.
 	let is_comments = path.contains("/comments/");
 	let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs());
-	if is_comments && now < COMMENTS_API_BLOCKED_UNTIL.load(Ordering::Relaxed) {
+	if is_comments && (param(&path, "cursor").is_some() || now < COMMENTS_API_BLOCKED_UNTIL.load(Ordering::Relaxed)) {
 		return Box::pin(crate::shreddit::thread(&path, quarantine)).await;
 	}
 
