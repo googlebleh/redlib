@@ -1,7 +1,7 @@
 use crate::dbg_msg;
 use crate::oauth::{force_refresh_token, token_daemon, Oauth, OauthBackendImpl};
 use crate::server::RequestExt;
-use crate::utils::{format_url, Post};
+use crate::utils::{format_url, prefix, Post};
 use arc_swap::ArcSwap;
 use cached::proc_macro::cached;
 use futures_lite::future::block_on;
@@ -155,7 +155,10 @@ pub async fn canonical_path(path: String, tries: i8) -> Result<Option<String>, S
 				// So we need to strip the .json suffix from the original path, and
 				// also remove all Reddit domain parts with format_url.
 				// Otherwise, it will literally redirect to Reddit.com.
-				let uri = comments_logical_path(&format_url(stripped_uri));
+				// format_url also applies REDLIB_BASE_PATH, but this path is sent back
+				// to Reddit (and re-prefixed on redirect), so strip the prefix here.
+				let formatted = format_url(stripped_uri);
+				let uri = comments_logical_path(formatted.strip_prefix(prefix()).unwrap_or(&formatted));
 
 				// Decrement tries and try again
 				canonical_path(uri, tries - 1).await
