@@ -65,8 +65,7 @@ async fn font() -> Result<Response<Body>, String> {
 async fn manifest() -> Result<Response<Body>, String> {
 	// Patch the static manifest's `start_url` with the configured base path
 	// so the PWA opens at the correct location when hosted at a subpath.
-	static MANIFEST: LazyLock<String> =
-		LazyLock::new(|| include_str!("../static/manifest.json").replace("\"start_url\": \"/\"", &format!("\"start_url\": \"{}/\"", prefix())));
+	static MANIFEST: LazyLock<String> = LazyLock::new(|| include_str!("../static/manifest.json").replace("\"start_url\": \"/\"", &format!("\"start_url\": \"{}/\"", prefix())));
 	resource(&MANIFEST, "application/json", false).await
 }
 

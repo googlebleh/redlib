@@ -1492,7 +1492,11 @@ pub fn get_post_url(post: &Post) -> String {
 	}
 
 	if let Some(out_url) = &post.out_url {
-		return if out_url.starts_with("/r/") { to_absolute_url(&with_prefix(out_url)) } else { out_url.clone() };
+		return if out_url.starts_with("/r/") {
+			to_absolute_url(&with_prefix(out_url))
+		} else {
+			out_url.clone()
+		};
 	}
 
 	to_absolute_url(&with_prefix(&post.permalink))
@@ -1506,8 +1510,8 @@ pub fn to_absolute_url(relative_path: &str) -> String {
 #[cfg(test)]
 pub(crate) mod tests {
 	use super::{
-		cookie_path, deflate_compress, deflate_decompress, format_num, format_url, get_post_url, prefix, render_bullet_lists, rewrite_emotes, rewrite_urls, url_path_basename, with_prefix, Author,
-		Awards, Comment, Flags, Flair, Media, Post, Preferences,
+		cookie_path, deflate_compress, deflate_decompress, format_num, format_url, get_post_url, prefix, render_bullet_lists, rewrite_emotes, rewrite_urls, url_path_basename,
+		with_prefix, Author, Awards, Comment, Flags, Flair, Media, Post, Preferences,
 	};
 	use askama::Template;
 	use sealed_test::prelude::*;
@@ -1522,7 +1526,12 @@ pub(crate) mod tests {
 			body: String::new(),
 			author: Author {
 				name: String::new(),
-				flair: Flair { flair_parts: Vec::new(), text: String::new(), background_color: String::new(), foreground_color: String::new() },
+				flair: Flair {
+					flair_parts: Vec::new(),
+					text: String::new(),
+					background_color: String::new(),
+					foreground_color: String::new(),
+				},
 				distinguished: String::new(),
 			},
 			permalink: String::new(),
@@ -1531,10 +1540,33 @@ pub(crate) mod tests {
 			score: (String::new(), String::new()),
 			upvote_ratio: 0,
 			post_type: String::new(),
-			flair: Flair { flair_parts: Vec::new(), text: String::new(), background_color: String::new(), foreground_color: String::new() },
-			flags: Flags { spoiler: false, nsfw: false, stickied: false },
-			thumbnail: Media { url: String::new(), alt_url: String::new(), width: 0, height: 0, poster: String::new(), download_name: String::new() },
-			media: Media { url: String::new(), alt_url: String::new(), width: 0, height: 0, poster: String::new(), download_name: String::new() },
+			flair: Flair {
+				flair_parts: Vec::new(),
+				text: String::new(),
+				background_color: String::new(),
+				foreground_color: String::new(),
+			},
+			flags: Flags {
+				spoiler: false,
+				nsfw: false,
+				stickied: false,
+			},
+			thumbnail: Media {
+				url: String::new(),
+				alt_url: String::new(),
+				width: 0,
+				height: 0,
+				poster: String::new(),
+				download_name: String::new(),
+			},
+			media: Media {
+				url: String::new(),
+				alt_url: String::new(),
+				width: 0,
+				height: 0,
+				poster: String::new(),
+				download_name: String::new(),
+			},
 			domain: String::new(),
 			rel_time: String::new(),
 			created: String::new(),
@@ -1915,7 +1947,10 @@ How`s your monitor by the way? Any IPS bleed whatsoever? I either got lucky or t
 			format_url("https://preview.redd.it/qwerty.jpg?auto=webp&s=asdf"),
 			"/redlib/preview/pre/qwerty.jpg?auto=webp&s=asdf"
 		);
-		assert_eq!(format_url("https://www.redditstatic.com/gold/awards/icon/icon.png"), "/redlib/static/gold/awards/icon/icon.png");
+		assert_eq!(
+			format_url("https://www.redditstatic.com/gold/awards/icon/icon.png"),
+			"/redlib/static/gold/awards/icon/icon.png"
+		);
 
 		// Sentinel inputs still produce empty strings (no prefixing).
 		assert_eq!(format_url(""), "");
@@ -1943,10 +1978,7 @@ How`s your monitor by the way? Any IPS bleed whatsoever? I either got lucky or t
 		assert_eq!(rewrite_urls(r#"<a href="/r/aww">/r/aww</a>"#), r#"<a href="/redlib/r/aww">/r/aww</a>"#);
 		assert_eq!(rewrite_urls(r#"<a href="/u/spez">/u/spez</a>"#), r#"<a href="/redlib/u/spez">/u/spez</a>"#);
 		assert_eq!(rewrite_urls(r#"<a href="/user/spez">/user/spez</a>"#), r#"<a href="/redlib/user/spez">/user/spez</a>"#);
-		assert_eq!(
-			rewrite_urls(r#"<a href="/comments/abc123/">link</a>"#),
-			r#"<a href="/redlib/comments/abc123/">link</a>"#
-		);
+		assert_eq!(rewrite_urls(r#"<a href="/comments/abc123/">link</a>"#), r#"<a href="/redlib/comments/abc123/">link</a>"#);
 	}
 
 	#[test]
@@ -1991,11 +2023,7 @@ How`s your monitor by the way? Any IPS bleed whatsoever? I either got lucky or t
 			let mut post = empty_post();
 			post.post_type = kind.to_string();
 			post.permalink = "/r/aww/comments/xyz/cat/".to_string();
-			assert_eq!(
-				get_post_url(&post),
-				"https://example.com/redlib/r/aww/comments/xyz/cat/",
-				"post_type={kind}"
-			);
+			assert_eq!(get_post_url(&post), "https://example.com/redlib/r/aww/comments/xyz/cat/", "post_type={kind}");
 		}
 	}
 

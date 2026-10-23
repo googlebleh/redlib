@@ -666,12 +666,11 @@ fn apply_enclosure(item: &mut Item, post: &Post) {
 	// Embed the number of gallery images in description and content since
 	// only the first image in the gallery is used for the enclosure
 	if post.post_type == "gallery" && post.gallery.len() > 1 {
-		item.set_description(
-			format!("<a href='{}'>Gallery with {} images</a>",
-				to_absolute_url(&utils::with_prefix(&post.permalink)),
-				post.gallery.len()
-			)
-		);
+		item.set_description(format!(
+			"<a href='{}'>Gallery with {} images</a>",
+			to_absolute_url(&utils::with_prefix(&post.permalink)),
+			post.gallery.len()
+		));
 
 		if let Some(content) = item.content() {
 			let new_content = format!("{}<br/>{}", item.description().unwrap_or(""), content,);
