@@ -1,6 +1,4 @@
-// Fallback for post pages when Reddit blocks the `/comments/` JSON API
-// (403 "blocked by network security" since 2026-10-20; `client::request`
-// currently gets past it by encoding a slash).
+// Fallback for post pages when GraphQL (gql.rs) fails.
 //
 // The post itself still comes from the JSON API (`/by_id`). Comments are scraped
 // from the HTML fragments reddit.com loads them from (`/svc/shreddit/...`) and
@@ -52,7 +50,7 @@ pub async fn thread(path: &str, quarantine: bool) -> Result<Value, String> {
 
 /// Extracts the post ID and optional comment ID from paths like
 /// `/r/{sub}/comments/{id}/{title}/{comment_id}.json?...`.
-fn parse_path(path: &str) -> Option<(String, Option<String>)> {
+pub(crate) fn parse_path(path: &str) -> Option<(String, Option<String>)> {
 	let path = path.split('?').next()?.trim_end_matches(".json");
 	let mut segments = path.split('/').skip_while(|s| *s != "comments").skip(1);
 	let id = segments.next().filter(|s| !s.is_empty())?.to_string();
@@ -103,7 +101,7 @@ async fn more(sub: &str, id: &str, cursor: &str, quarantine: bool) -> Result<Str
 	res.text().await.map_err(|e| e.to_string())
 }
 
-fn listing(children: Vec<Value>) -> Value {
+pub(crate) fn listing(children: Vec<Value>) -> Value {
 	json_value!({ "kind": "Listing", "data": { "children": children } })
 }
 
@@ -307,7 +305,7 @@ fn clean_html(el: ElementRef) -> String {
 }
 
 /// Escaped URL attribute value, proxied through Redlib for Reddit media. Empty for `javascript:` URLs.
-fn url_attr(value: Option<&str>) -> String {
+pub(crate) fn url_attr(value: Option<&str>) -> String {
 	let value = value.unwrap_or_default().trim();
 	if value.to_lowercase().starts_with("javascript:") {
 		return String::new();
