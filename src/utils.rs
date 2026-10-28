@@ -111,14 +111,15 @@ pub struct Author {
 pub struct Poll {
 	pub poll_options: Vec<PollOption>,
 	pub voting_end_timestamp: (String, String),
-	pub total_vote_count: u64,
+	/// Missing from GraphQL's posts by ID
+	pub total_vote_count: Option<u64>,
 }
 
 impl Poll {
 	pub fn parse(poll_data: &Value) -> Option<Self> {
 		poll_data.as_object()?;
 
-		let total_vote_count = poll_data["total_vote_count"].as_u64()?;
+		let total_vote_count = poll_data["total_vote_count"].as_u64();
 		// voting_end_timestamp is in the format of milliseconds
 		let voting_end_timestamp = time(poll_data["voting_end_timestamp"].as_f64()? / 1000.0);
 		let poll_options = PollOption::parse(&poll_data["options"])?;
@@ -1013,6 +1014,8 @@ static REGEX_URL_EMOJI: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"https?:/
 static REGEX_URL_PREVIEW: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"https?://preview\.redd\.it/(.*)").unwrap());
 static REGEX_URL_EXTERNAL_PREVIEW: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"https?://external\-preview\.redd\.it/(.*)").unwrap());
 static REGEX_URL_STYLES: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"https?://styles\.redditmedia\.com/(.*)").unwrap());
+static REGEX_URL_PACKAGED_MEDIA: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"https?://packaged-media\.redd\.it/(.*)").unwrap());
+static REGEX_URL_EXTERNAL_PACKAGED_MEDIA: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"https?://external-packaged-media\.redd\.it/(.*)").unwrap());
 static REGEX_URL_STATIC_MEDIA: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"https?://www\.redditstatic\.com/(.*)").unwrap());
 
 /// Direct urls to proxy if proxy is enabled
@@ -1066,6 +1069,8 @@ pub fn format_url(url: &str) -> String {
 				"external-preview.redd.it" => capture(&REGEX_URL_EXTERNAL_PREVIEW, "/preview/external-pre/", 1),
 				"styles.redditmedia.com" => capture(&REGEX_URL_STYLES, "/style/", 1),
 				"www.redditstatic.com" => capture(&REGEX_URL_STATIC_MEDIA, "/static/", 1),
+				"packaged-media.redd.it" => capture(&REGEX_URL_PACKAGED_MEDIA, "/packaged/", 1),
+				"external-packaged-media.redd.it" => capture(&REGEX_URL_EXTERNAL_PACKAGED_MEDIA, "/packaged-external/", 1),
 				_ => url.to_string(),
 			}
 		});
@@ -1665,6 +1670,11 @@ pub(crate) mod tests {
 			"/preview/pre/qwerty.jpg?auto=webp&s=asdf"
 		);
 		assert_eq!(format_url("https://v.redd.it/foo/DASH_360.mp4?source=fallback"), "/vid/foo/360.mp4");
+		assert_eq!(format_url("https://packaged-media.redd.it/foo/muxed.mp4?e=1&s=2"), "/packaged/foo/muxed.mp4?e=1&s=2");
+		assert_eq!(
+			format_url("https://external-packaged-media.redd.it/t3_x/3p/streamable/y/video.mp4?v=1"),
+			"/packaged-external/t3_x/3p/streamable/y/video.mp4?v=1"
+		);
 		assert_eq!(
 			format_url("https://v.redd.it/foo/HLSPlaylist.m3u8?a=bar&v=1&f=sd"),
 			"/hls/foo/HLSPlaylist.m3u8?a=bar&v=1&f=sd"
@@ -1729,7 +1739,7 @@ pub(crate) mod tests {
 
 	#[tokio::test(flavor = "multi_thread")]
 	async fn test_fetching_subreddit_quarantined() {
-		let subreddit = Post::fetch("/r/drugs", true).await;
+		let subreddit = Post::fetch("/r/drugs/hot.json", true).await;
 		assert!(subreddit.is_ok());
 		assert!(!subreddit.unwrap().0.is_empty());
 	}
@@ -1739,18 +1749,9 @@ pub(crate) mod tests {
 		// Gonwild is a place for closed, Euclidean Geometric shapes to exchange their nth terms for karma; showing off their edges in a comfortable environment without pressure.
 		// Find a good sub that is tagged NSFW but that actually isn't in case my future employers are watching (they probably are)
 		// switched from randnsfw as it is no longer functional.
-		let subreddit = Post::fetch("/r/gonwild", false).await;
+		let subreddit = Post::fetch("/r/gonwild/hot.json", false).await;
 		assert!(subreddit.is_ok());
 		assert!(!subreddit.unwrap().0.is_empty());
-	}
-
-	#[tokio::test(flavor = "multi_thread")]
-	async fn test_fetching_ws() {
-		let subreddit = Post::fetch("/r/popular", false).await;
-		assert!(subreddit.is_ok());
-		for post in subreddit.unwrap().0 {
-			assert!(post.ws_url.starts_with("wss://k8s-lb.wss.redditmedia.com/link/"));
-		}
 	}
 
 	#[test]

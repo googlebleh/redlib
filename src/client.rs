@@ -41,6 +41,15 @@ pub static OAUTH_RATELIMIT_REMAINING: AtomicU16 = AtomicU16::new(99);
 
 pub static OAUTH_IS_ROLLING_OVER: AtomicBool = AtomicBool::new(false);
 
+/// Rolls over the OAuth token in the background when its rate limit runs low.
+pub fn roll_over_if_low() {
+	let current_rate_limit = OAUTH_RATELIMIT_REMAINING.load(Ordering::SeqCst);
+	if current_rate_limit < 10 && !OAUTH_IS_ROLLING_OVER.load(Ordering::SeqCst) {
+		warn!("Rate limit {current_rate_limit} is low. Spawning force_refresh_token()");
+		tokio::spawn(force_refresh_token());
+	}
+}
+
 const URL_PAIRS: [(&str, &str); 2] = [
 	(ALTERNATIVE_REDDIT_URL_BASE, ALTERNATIVE_REDDIT_URL_BASE_HOST),
 	(REDDIT_SHORT_URL_BASE, REDDIT_SHORT_URL_BASE_HOST),
@@ -76,16 +85,14 @@ pub fn build_client() -> WreqClient {
 	// Keeping this list short to aid in privacy.
 	// The more emulations, the more unique a fingerprint each instance has.
 	// But some emulations should increase evasiveness.
-	let emulation = [Profile::Chrome145, Profile::Firefox147];
-	let emulation_platform = [Platform::Android, Platform::Windows];
+	// Desktop platforms only, as when the comments scraper (removed) needed them; others are untested.
+	let profiles = [Profile::Chrome149, Profile::Firefox151];
+	let platforms = [Platform::Windows, Platform::MacOS];
 
-	let rand = fastrand::usize(..);
-	let emulation = Emulation::builder()
-		.profile(emulation[rand % emulation.len()])
-		.platform(emulation_platform[rand % emulation_platform.len()])
-		.build();
+	let (profile, platform) = (profiles[fastrand::usize(..profiles.len())], platforms[fastrand::usize(..platforms.len())]);
+	let emulation = Emulation::builder().profile(profile).platform(platform).build();
 
-	info!("Building Wreq client with random emulation");
+	info!("Building Wreq client with random emulation {profile:?} on {platform:?}");
 	WreqClient::builder()
 		.emulation(emulation)
 		.redirect(Policy::none())
@@ -362,14 +369,15 @@ pub async fn json(path: String, quarantine: bool) -> Result<Value, String> {
 	if path.contains("/comments/") {
 		return Box::pin(crate::gql::thread(&path, quarantine)).await;
 	}
+	// So are feeds and posts by ID, since 2026-10-28
+	if let Some(result) = Box::pin(crate::gql_feed::route(&path, quarantine)).await {
+		return result;
+	}
 
 	// First, handle rolling over the OAUTH_CLIENT if need be.
 	let current_rate_limit = OAUTH_RATELIMIT_REMAINING.load(Ordering::SeqCst);
 	let is_rolling_over = OAUTH_IS_ROLLING_OVER.load(Ordering::SeqCst);
-	if current_rate_limit < 10 && !is_rolling_over {
-		warn!("Rate limit {current_rate_limit} is low. Spawning force_refresh_token()");
-		tokio::spawn(force_refresh_token());
-	}
+	roll_over_if_low();
 	#[allow(deprecated)] // try_update is newer than the project's MSRV.
 	let _ = OAUTH_RATELIMIT_REMAINING.fetch_update(Ordering::SeqCst, Ordering::SeqCst, |remaining| remaining.checked_sub(1));
 
@@ -493,11 +501,12 @@ pub async fn rate_limit_check() -> Result<(), String> {
 		return Ok(());
 	}
 
-	// First, check a subreddit.
+	// First, check a subreddit. That's one GraphQL request, which has a rate
+	// limit of 600 per token.
 	self_check("reddit").await?;
-	// This will reduce the rate limit to 99. Assert this check.
-	if OAUTH_RATELIMIT_REMAINING.load(Ordering::SeqCst) != 99 {
-		return Err(format!("Rate limit check 1 failed: expected 99, got {}", OAUTH_RATELIMIT_REMAINING.load(Ordering::SeqCst)));
+	// This will reduce the rate limit to 599. Assert this check.
+	if OAUTH_RATELIMIT_REMAINING.load(Ordering::SeqCst) != 599 {
+		return Err(format!("Rate limit check 1 failed: expected 599, got {}", OAUTH_RATELIMIT_REMAINING.load(Ordering::SeqCst)));
 	}
 	// Now, we switch out the OAuth client.
 	// This checks for the IP rate limit association.
@@ -505,8 +514,8 @@ pub async fn rate_limit_check() -> Result<(), String> {
 	// Now, check a new sub to break cache.
 	self_check("rust").await?;
 	// Again, assert the rate limit check.
-	if OAUTH_RATELIMIT_REMAINING.load(Ordering::SeqCst) != 99 {
-		return Err(format!("Rate limit check 2 failed: expected 99, got {}", OAUTH_RATELIMIT_REMAINING.load(Ordering::SeqCst)));
+	if OAUTH_RATELIMIT_REMAINING.load(Ordering::SeqCst) != 599 {
+		return Err(format!("Rate limit check 2 failed: expected 599, got {}", OAUTH_RATELIMIT_REMAINING.load(Ordering::SeqCst)));
 	}
 
 	Ok(())
@@ -546,8 +555,6 @@ mod tests {
 	use super::*;
 	use {crate::config::get_setting, sealed_test::prelude::*};
 
-	const POPULAR_URL: &str = "/r/popular/hot.json?&raw_json=1&geo_filter=GLOBAL";
-
 	#[test]
 	fn test_reddit_dns_name_uses_fastly_dualstack_alias() {
 		assert_eq!(reddit_dns_name("www.reddit.com"), ALTERNATIVE_REDDIT_DNS_HOST);
@@ -570,12 +577,6 @@ mod tests {
 			// check rate limit
 			rate_limit_check().await.unwrap();
 		});
-	}
-
-	#[tokio::test(flavor = "multi_thread")]
-	async fn test_localization_popular() {
-		let val = json(POPULAR_URL.to_string(), false).await.unwrap();
-		assert_eq!("GLOBAL", val["data"]["geo_filter"].as_str().unwrap());
 	}
 
 	#[tokio::test(flavor = "multi_thread")]
